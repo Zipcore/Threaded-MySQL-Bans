@@ -1,274 +1,274 @@
-#include <sourcemod> 
-#include <sdktools> 
-#define PLUGIN_VERSION "1.3 (enhanced)" 
+#include <sourcemod>
+#include <sdktools>
+#define PLUGIN_VERSION "1.3 (enhanced)"
 
-public Plugin:myinfo = { 
-    name = "[ANY] MySQL-T Bans", 
-    author = "senseless", 
-    description = "Threaded steam id based mysql bans", 
-    version = PLUGIN_VERSION, 
-    url = "https://forums.alliedmods.net/showthread.php?p=1759904" 
-}; 
+public Plugin myinfo = {
+    name = "[ANY] MySQL-T Bans",
+    author = "senseless | enhanced by sneakret | modified by Shadow_Man",
+    description = "Threaded steam id based mysql bans",
+    version = PLUGIN_VERSION,
+    url = "https://forums.alliedmods.net/showthread.php?p=1759904"
+};
 
-new Handle:hDatabase = INVALID_HANDLE; 
+new Handle:hDatabase = INVALID_HANDLE;
 
-public OnPluginStart() { 
-    VerifyTable(); 
-    StartSQL(); 
-    CreateConVar("sm_mybans_version", PLUGIN_VERSION, "MYSQL-T Bans Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY); 
-    AddCommandListener(OnAddBan, "sm_addban"); 
-} 
+public OnPluginStart() {
+    VerifyTable();
+    StartSQL();
+    CreateConVar("sm_mybans_version", PLUGIN_VERSION, "MYSQL-T Bans Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+    AddCommandListener(OnAddBan, "sm_addban");
+}
 
-public Action:OnAddBan(client, const String:command[], argc) { 
-    
+public Action:OnAddBan(client, const String:command[], argc) {
+
 	if (!CheckCommandAccess(client, "sm_addban", ADMFLAG_BAN))
 	{
 		return Plugin_Handled;
 	}
-	
-	if (argc < 2) 
-    { 
-        PrintToChat( 
-            client, 
-            "[SM] Usage: %s <minutes|0> <#userid|name> [reason]", 
-            command); 
-        return Plugin_Handled; 
+
+	if (argc < 2)
+    {
+        PrintToChat(
+            client,
+            "[SM] Usage: %s <minutes|0> <#userid|name> [reason]",
+            command);
+        return Plugin_Handled;
     }
 
-    decl String:arguments[256]; 
-    GetCmdArgString(arguments, sizeof(arguments)); 
+    decl String:arguments[256];
+    GetCmdArgString(arguments, sizeof(arguments));
 
-    decl String:time_string[10]; 
-    decl len; 
-    len = BreakString(arguments, time_string, sizeof(time_string)); 
+    decl String:time_string[10];
+    decl len;
+    len = BreakString(arguments, time_string, sizeof(time_string));
 
-    decl String:steam_id[32]; 
-    decl next_len; 
-    next_len = BreakString(arguments[len], steam_id, sizeof(steam_id)); 
-    if (next_len != -1) 
-    { 
-        len += next_len; 
-    } 
-    else 
-    { 
-        len = 0; 
-        arguments[0] = '\0'; 
-    } 
+    decl String:steam_id[32];
+    decl next_len;
+    next_len = BreakString(arguments[len], steam_id, sizeof(steam_id));
+    if (next_len != -1)
+    {
+        len += next_len;
+    }
+    else
+    {
+        len = 0;
+        arguments[0] = '\0';
+    }
 
-    decl String:ban_reason[100]; 
-    next_len = BreakString(arguments[len], ban_reason, sizeof(ban_reason)); 
-    if (next_len != -1) 
-    { 
-        len += next_len; 
-    } 
-    else 
-    { 
-        len = 0; 
-        arguments[0] = '\0'; 
-    } 
+    decl String:ban_reason[100];
+    next_len = BreakString(arguments[len], ban_reason, sizeof(ban_reason));
+    if (next_len != -1)
+    {
+        len += next_len;
+    }
+    else
+    {
+        len = 0;
+        arguments[0] = '\0';
+    }
 
-    new time = StringToInt(time_string); 
+    new time = StringToInt(time_string);
 
-    decl String:duration_string[60]; 
-    GetDurationString(duration_string, sizeof(duration_string), time); 
+    decl String:duration_string[60];
+    GetDurationString(duration_string, sizeof(duration_string), time);
 
-    if (client != 0) { 
-        MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client); 
-        LogAction(client, 0, "%L banned Steam ID %s (%s): %s", client, steam_id, duration_string, ban_reason); 
-    } else { 
-        MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client); 
-        LogAction(0, 0, "Console banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason); 
-    } 
-    ReplyToCommand(client, "[MYBans] Banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason); 
+    if (client != 0) {
+        MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client);
+        LogAction(client, 0, "%L banned Steam ID %s (%s): %s", client, steam_id, duration_string, ban_reason);
+    } else {
+        MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client);
+        LogAction(0, 0, "Console banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason);
+    }
+    ReplyToCommand(client, "[MYBans] Banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason);
 
-    return Plugin_Stop; 
-} 
+    return Plugin_Stop;
+}
 
-GetDurationString(String:duration_string[], duration_string_size, duration) 
-{ 
-    if (duration == 0) { 
-        strcopy(duration_string, duration_string_size, "permanently"); 
-    } else { 
-        Format(duration_string, duration_string_size, "%d %s", duration, (duration == 1) ? "minute" : "minutes"); 
-    } 
-} 
+GetDurationString(String:duration_string[], duration_string_size, duration)
+{
+    if (duration == 0) {
+        strcopy(duration_string, duration_string_size, "permanently");
+    } else {
+        Format(duration_string, duration_string_size, "%d %s", duration, (duration == 1) ? "minute" : "minutes");
+    }
+}
 
-StartSQL() { 
-    SQL_TConnect(GotDatabase); 
-} 
+StartSQL() {
+    SQL_TConnect(GotDatabase);
+}
 
-public GotDatabase(Handle:owner, Handle:hndl, const String:error[], any:data) { 
-    if (hndl == INVALID_HANDLE) { 
-        LogError("[MYBans] Database Connection Error: %s", error); 
-    } else { 
-        hDatabase = hndl; 
-    } 
-} 
+public GotDatabase(Handle:owner, Handle:hndl, const String:error[], any:data) {
+    if (hndl == INVALID_HANDLE) {
+        LogError("[MYBans] Database Connection Error: %s", error);
+    } else {
+        hDatabase = hndl;
+    }
+}
 
-public T_AuthCheck(Handle:owner, Handle:hndl, const String:error[], any:data) { 
-    new client; 
-    decl ban_length;     
-    decl String:steam_id[32]; 
-    decl String:ban_reason[100]; 
-    decl ban_remaining; 
-    decl String:query[255]; 
-         
-    if ((client = GetClientOfUserId(data)) == 0) { 
-        return; 
-    } 
+public T_AuthCheck(Handle:owner, Handle:hndl, const String:error[], any:data) {
+    new client;
+    decl ban_length;
+    decl String:steam_id[32];
+    decl String:ban_reason[100];
+    decl ban_remaining;
+    decl String:query[255];
 
-    GetClientAuthString(client, steam_id, sizeof(steam_id)); 
+    if ((client = GetClientOfUserId(data)) == 0) {
+        return;
+    }
 
-    new buffer_len = strlen(steam_id) * 2 + 1 
-    new String:v_steam_id[buffer_len] 
-    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len) 
+    GetClientAuthString(client, steam_id, sizeof(steam_id));
 
-    if (hndl == INVALID_HANDLE) { 
-        LogError("[MYBans] Query failed! %s", error); 
-        KickClient(client, "Error: Reattempt connection"); 
-    } 
+    new buffer_len = strlen(steam_id) * 2 + 1
+    new String:v_steam_id[buffer_len]
+    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len)
 
-    if(SQL_FetchRow(hndl)) { 
-        ban_length = SQL_FetchInt(hndl,0); 
-        SQL_FetchString(hndl,1,ban_reason,sizeof(ban_reason)); 
+    if (hndl == INVALID_HANDLE) {
+        LogError("[MYBans] Query failed! %s", error);
+        KickClient(client, "Error: Reattempt connection");
+    }
 
-        if (ban_length == 0) { 
-            ban_remaining = 0; 
-        } else { 
-            ban_remaining = ban_length - SQL_FetchInt(hndl,2); 
-        } 
+    if(SQL_FetchRow(hndl)) {
+        ban_length = SQL_FetchInt(hndl,0);
+        SQL_FetchString(hndl,1,ban_reason,sizeof(ban_reason));
 
-        if (ban_length == 0 || ban_remaining > 0) { 
-            decl String:duration_string[60]; 
-            GetDurationString(duration_string, sizeof(duration_string), ban_remaining); 
-            KickClient(client,"Banned (%s): %s", duration_string, ban_reason); 
-        } else { 
-            Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s'", v_steam_id); 
-            SQL_TQuery(hDatabase, T_MYUnBan, query); 
-            LogAction(0, 0, "Allowing %L to connect. Ban has expired.", client); 
-        } 
-    } 
-} 
+        if (ban_length == 0) {
+            ban_remaining = 0;
+        } else {
+            ban_remaining = ban_length - SQL_FetchInt(hndl,2);
+        }
 
-public T_MYBan(Handle:owner, Handle:hndl, const String:error[], any:data) { 
-    if (hndl == INVALID_HANDLE) { 
-        LogError("[MYBans] Query failed! %s", error); 
-    } 
-    return; 
-} 
+        if (ban_length == 0 || ban_remaining > 0) {
+            decl String:duration_string[60];
+            GetDurationString(duration_string, sizeof(duration_string), ban_remaining);
+            KickClient(client,"Banned (%s): %s", duration_string, ban_reason);
+        } else {
+            Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s'", v_steam_id);
+            SQL_TQuery(hDatabase, T_MYUnBan, query);
+            LogAction(0, 0, "Allowing %L to connect. Ban has expired.", client);
+        }
+    }
+}
 
-public T_MYUnBan(Handle:owner, Handle:hndl, const String:error[], any:data) { 
-    if (hndl == INVALID_HANDLE) { 
-        LogError("[MYBans] Query failed! %s", error); 
-    } 
-    return; 
-} 
+public T_MYBan(Handle:owner, Handle:hndl, const String:error[], any:data) {
+    if (hndl == INVALID_HANDLE) {
+        LogError("[MYBans] Query failed! %s", error);
+    }
+    return;
+}
 
-public OnClientPostAdminCheck(client) { 
+public T_MYUnBan(Handle:owner, Handle:hndl, const String:error[], any:data) {
+    if (hndl == INVALID_HANDLE) {
+        LogError("[MYBans] Query failed! %s", error);
+    }
+    return;
+}
 
-    if(IsFakeClient(client)) { 
-        return; 
-    } 
+public OnClientPostAdminCheck(client) {
 
-    decl String:steam_id[32]; 
-    decl String:query[255]; 
+    if(IsFakeClient(client)) {
+        return;
+    }
 
-    GetClientAuthString(client, steam_id, sizeof(steam_id)); 
+    decl String:steam_id[32];
+    decl String:query[255];
 
-    new buffer_len = strlen(steam_id) * 2 + 1 
-    new String:v_steam_id[buffer_len] 
-    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len) 
+    GetClientAuthString(client, steam_id, sizeof(steam_id));
 
-    Format(query, sizeof(query), "SELECT ban_length, ban_reason, (now()-timestamp)/60 FROM my_bans WHERE steam_id = '%s'", v_steam_id); 
-    SQL_TQuery(hDatabase, T_AuthCheck, query, GetClientUserId(client)); 
-} 
+    new buffer_len = strlen(steam_id) * 2 + 1
+    new String:v_steam_id[buffer_len]
+    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len)
 
-MyBanClient(const String:steam_id[], const String:player_name[], time, const String:reason[], admin) { 
-    decl String:query[255]; 
-    decl String:source[100]; 
+    Format(query, sizeof(query), "SELECT ban_length, ban_reason, (now()-timestamp)/60 FROM my_bans WHERE steam_id = '%s'", v_steam_id);
+    SQL_TQuery(hDatabase, T_AuthCheck, query, GetClientUserId(client));
+}
 
-    if (admin == 0) { 
-        strcopy(source, sizeof(source), "Console"); 
-    } else { 
-        Format(source, sizeof(source), "%L", admin); 
-    } 
+MyBanClient(const String:steam_id[], const String:player_name[], time, const String:reason[], admin) {
+    decl String:query[255];
+    decl String:source[100];
 
-    new buffer_len = strlen(steam_id) * 2 + 1 
-    new String:v_steam_id[buffer_len] 
-    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len) 
+    if (admin == 0) {
+        strcopy(source, sizeof(source), "Console");
+    } else {
+        Format(source, sizeof(source), "%L", admin);
+    }
 
-    buffer_len = strlen(reason) * 2 + 1 
-    new String:v_reason[buffer_len] 
-    SQL_EscapeString(hDatabase, reason, v_reason, buffer_len) 
+    new buffer_len = strlen(steam_id) * 2 + 1
+    new String:v_steam_id[buffer_len]
+    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len)
 
-    buffer_len = strlen(source) * 2 + 1 
-    new String:v_source[buffer_len] 
-    SQL_EscapeString(hDatabase, source, v_source, buffer_len) 
+    buffer_len = strlen(reason) * 2 + 1
+    new String:v_reason[buffer_len]
+    SQL_EscapeString(hDatabase, reason, v_reason, buffer_len)
 
-    buffer_len = strlen(player_name) * 2 + 1 
-    new String:v_player_name[buffer_len] 
-    SQL_EscapeString(hDatabase, player_name, v_player_name, buffer_len) 
+    buffer_len = strlen(source) * 2 + 1
+    new String:v_source[buffer_len]
+    SQL_EscapeString(hDatabase, source, v_source, buffer_len)
 
-    Format(query, sizeof(query), "REPLACE INTO my_bans (player_name, steam_id, ban_length, ban_reason, banned_by, timestamp) VALUES ('%s','%s','%d','%s','%s',CURRENT_TIMESTAMP)", v_player_name, v_steam_id, time, v_reason, v_source); 
-    SQL_TQuery(hDatabase, T_MYBan, query); 
-} 
+    buffer_len = strlen(player_name) * 2 + 1
+    new String:v_player_name[buffer_len]
+    SQL_EscapeString(hDatabase, player_name, v_player_name, buffer_len)
 
-public Action:OnBanClient(client, time, flags, const String:reason[], const String:kick_message[], const String:command[], any:admin) { 
-    decl String:steam_id[32]; 
-    decl String:player_name[65]; 
-    GetClientAuthString(client, steam_id, sizeof(steam_id)); 
-    GetClientName(client, player_name, sizeof(player_name)); 
-    MyBanClient(steam_id, player_name, time, reason, admin); 
-    decl String:duration_string[60]; 
-    GetDurationString(duration_string, sizeof(duration_string), time); 
-    KickClient(client,"Banned (%s): %s", duration_string, reason); 
-    LogAction(admin, client, "%L banned %L (%s): %s", admin, client, duration_string, reason); 
-    return Plugin_Stop; 
-} 
+    Format(query, sizeof(query), "REPLACE INTO my_bans (player_name, steam_id, ban_length, ban_reason, banned_by, timestamp) VALUES ('%s','%s','%d','%s','%s',CURRENT_TIMESTAMP)", v_player_name, v_steam_id, time, v_reason, v_source);
+    SQL_TQuery(hDatabase, T_MYBan, query);
+}
 
-public Action:OnRemoveBan(const String:steam_id[], flags, const String:command[], any:admin) { 
-    decl String:query[255]; 
+public Action:OnBanClient(client, time, flags, const String:reason[], const String:kick_message[], const String:command[], any:admin) {
+    decl String:steam_id[32];
+    decl String:player_name[65];
+    GetClientAuthString(client, steam_id, sizeof(steam_id));
+    GetClientName(client, player_name, sizeof(player_name));
+    MyBanClient(steam_id, player_name, time, reason, admin);
+    decl String:duration_string[60];
+    GetDurationString(duration_string, sizeof(duration_string), time);
+    KickClient(client,"Banned (%s): %s", duration_string, reason);
+    LogAction(admin, client, "%L banned %L (%s): %s", admin, client, duration_string, reason);
+    return Plugin_Stop;
+}
 
-    new buffer_len = strlen(steam_id) * 2 + 1 
-    new String:v_steam_id[buffer_len] 
-    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len) 
+public Action:OnRemoveBan(const String:steam_id[], flags, const String:command[], any:admin) {
+    decl String:query[255];
 
-    Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s'", v_steam_id); 
-    SQL_TQuery(hDatabase, T_MYUnBan, query); 
-    ReplyToCommand(admin, "[MYBans] User %s has been unbanned", steam_id); 
-    LogAction(admin, 0, "%L unbanned Steam ID %s.", admin, steam_id); 
-    return Plugin_Stop; 
-} 
+    new buffer_len = strlen(steam_id) * 2 + 1
+    new String:v_steam_id[buffer_len]
+    SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len)
 
-bool:VerifyTable() { 
-    decl String:error[255]; 
-    decl String:query[512]; 
+    Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s'", v_steam_id);
+    SQL_TQuery(hDatabase, T_MYUnBan, query);
+    ReplyToCommand(admin, "[MYBans] User %s has been unbanned", steam_id);
+    LogAction(admin, 0, "%L unbanned Steam ID %s.", admin, steam_id);
+    return Plugin_Stop;
+}
 
-    new Handle:db = SQL_Connect("default", true, error, sizeof(error)); 
-    if (db == INVALID_HANDLE) { 
-        LogError("[MYBans] Could Not Connect to Database, error: %s", error); 
-        return false; 
-    } 
+bool:VerifyTable() {
+    decl String:error[255];
+    decl String:query[512];
 
-    Format(query,sizeof(query), "%s%s%s%s%s%s%s%s%s%s%s", 
-        "CREATE TABLE IF NOT EXISTS `my_bans` (", 
-        "  `id` int(11) NOT NULL auto_increment,", 
-        "  `steam_id` varchar(32) NOT NULL,", 
-        "  `player_name` varchar(65) NOT NULL,", 
-        "  `ban_length` int(1) NOT NULL default '0',", 
-        "  `ban_reason` varchar(100) NOT NULL,", 
-        "  `banned_by` varchar(100) NOT NULL,", 
-        "  `timestamp` timestamp NOT NULL default '0000-00-00 00:00:00' on update CURRENT_TIMESTAMP,", 
-        "  PRIMARY KEY  (`id`),", 
-        "  UNIQUE KEY `steam_id` (`steam_id`)", 
-        ") ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1; "); 
+    new Handle:db = SQL_Connect("default", true, error, sizeof(error));
+    if (db == INVALID_HANDLE) {
+        LogError("[MYBans] Could Not Connect to Database, error: %s", error);
+        return false;
+    }
 
-    new bool:success = SQL_FastQuery(db, query); 
-    if(!success) { 
-        SQL_GetError(db, error, sizeof(error)); 
-        LogError("[MYBans] Unable to verify mysql_bans table:%s", query); 
-    } 
+    Format(query,sizeof(query), "%s%s%s%s%s%s%s%s%s%s%s",
+        "CREATE TABLE IF NOT EXISTS `my_bans` (",
+        "  `id` int(11) NOT NULL auto_increment,",
+        "  `steam_id` varchar(32) NOT NULL,",
+        "  `player_name` varchar(65) NOT NULL,",
+        "  `ban_length` int(1) NOT NULL default '0',",
+        "  `ban_reason` varchar(100) NOT NULL,",
+        "  `banned_by` varchar(100) NOT NULL,",
+        "  `timestamp` timestamp NOT NULL default '0000-00-00 00:00:00' on update CURRENT_TIMESTAMP,",
+        "  PRIMARY KEY  (`id`),",
+        "  UNIQUE KEY `steam_id` (`steam_id`)",
+        ") ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1; ");
 
-    CloseHandle(db); 
-    return true; 
-}  
+    new bool:success = SQL_FastQuery(db, query);
+    if(!success) {
+        SQL_GetError(db, error, sizeof(error));
+        LogError("[MYBans] Unable to verify mysql_bans table:%s", query);
+    }
+
+    CloseHandle(db);
+    return true;
+}
