@@ -163,7 +163,7 @@ public Action OnBanClient(int client, int time, int flags, const char[] reason, 
 	KickClient(client, "Banned (%s): %s", duration_string, reason);
 	LogAction(admin, client, "%L banned %L (%s): %s", admin, client, duration_string, reason);
 
-	return Plugin_Stop;
+	return Plugin_Handled;
 }
 
 public Action OnAddBan(int client, const char[] command, int argc)
@@ -213,7 +213,7 @@ public Action OnAddBan(int client, const char[] command, int argc)
 	LogAction(client, 0, "%L banned Steam ID %s (%s): %s", client, steam_id, duration_string, ban_reason);
 	ReplyToCommand(client, "[MYBans] Banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason);
 
-	return Plugin_Stop;
+	return Plugin_Handled;
 }
 
 public Action OnRemoveBan(const char[] steam_id, int flags, const char[] command, any admin)
@@ -230,7 +230,7 @@ public Action OnRemoveBan(const char[] steam_id, int flags, const char[] command
 	ReplyToCommand(admin, "[MYBans] User %s has been unbanned", steam_id);
 	LogAction(admin, 0, "%L unbanned Steam ID %s.", admin, steam_id);
 
-	return Plugin_Stop;
+	return Plugin_Handled;
 }
 
 bool VerifyTable()
