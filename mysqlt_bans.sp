@@ -20,56 +20,6 @@ public void OnPluginStart()
 	AddCommandListener(OnAddBan, "sm_addban");
 }
 
-public Action OnAddBan(int client, const char[] command, int argc)
-{
-	if (!CheckCommandAccess(client, "sm_addban", ADMFLAG_BAN))
-		return Plugin_Handled;
-
-	if (argc < 2)
-	{
-		PrintToChat(client, "[SM] Usage: %s <minutes|0> <#userid|name> [reason]", command);
-		return Plugin_Handled;
-	}
-
-	char arguments[256];
-	GetCmdArgString(arguments, sizeof(arguments));
-
-	char time_string[10];
-	int len = BreakString(arguments, time_string, sizeof(time_string));
-
-	char steam_id[32];
-	int next_len = BreakString(arguments[len], steam_id, sizeof(steam_id));
-	if (next_len != -1)
-		len += next_len;
-	else
-	{
-		len = 0;
-		arguments[0] = '\0';
-	}
-
-	char ban_reason[100];
-	next_len = BreakString(arguments[len], ban_reason, sizeof(ban_reason));
-	if (next_len != -1)
-		len += next_len;
-	else
-	{
-		len = 0;
-		arguments[0] = '\0';
-	}
-
-	int time = StringToInt(time_string);
-
-	char duration_string[60];
-	GetDurationString(duration_string, sizeof(duration_string), time);
-
-	MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client);
-
-	LogAction(client, 0, "%L banned Steam ID %s (%s): %s", client, steam_id, duration_string, ban_reason);
-	ReplyToCommand(client, "[MYBans] Banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason);
-
-	return Plugin_Stop;
-}
-
 void GetDurationString(char[] duration_string, int duration_string_size, int duration)
 {
 	if (duration == 0)
@@ -212,6 +162,56 @@ public Action OnBanClient(int client, int time, int flags, const char[] reason, 
 
 	KickClient(client, "Banned (%s): %s", duration_string, reason);
 	LogAction(admin, client, "%L banned %L (%s): %s", admin, client, duration_string, reason);
+
+	return Plugin_Stop;
+}
+
+public Action OnAddBan(int client, const char[] command, int argc)
+{
+	if (!CheckCommandAccess(client, "sm_addban", ADMFLAG_BAN))
+		return Plugin_Handled;
+
+	if (argc < 2)
+	{
+		PrintToChat(client, "[SM] Usage: %s <minutes|0> <#userid|name> [reason]", command);
+		return Plugin_Handled;
+	}
+
+	char arguments[256];
+	GetCmdArgString(arguments, sizeof(arguments));
+
+	char time_string[10];
+	int len = BreakString(arguments, time_string, sizeof(time_string));
+
+	char steam_id[32];
+	int next_len = BreakString(arguments[len], steam_id, sizeof(steam_id));
+	if (next_len != -1)
+		len += next_len;
+	else
+	{
+		len = 0;
+		arguments[0] = '\0';
+	}
+
+	char ban_reason[100];
+	next_len = BreakString(arguments[len], ban_reason, sizeof(ban_reason));
+	if (next_len != -1)
+		len += next_len;
+	else
+	{
+		len = 0;
+		arguments[0] = '\0';
+	}
+
+	int time = StringToInt(time_string);
+
+	char duration_string[60];
+	GetDurationString(duration_string, sizeof(duration_string), time);
+
+	MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client);
+
+	LogAction(client, 0, "%L banned Steam ID %s (%s): %s", client, steam_id, duration_string, ban_reason);
+	ReplyToCommand(client, "[MYBans] Banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason);
 
 	return Plugin_Stop;
 }
