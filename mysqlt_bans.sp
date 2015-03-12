@@ -125,7 +125,10 @@ void MyBanClient(const char[] steam_id, const char[] player_name, int time, cons
 	char query[255];
 	char source[100];
 
-	Format(source, sizeof(source), "%L", admin);
+	if(admin == 0)
+		source = "Console";
+	else
+		GetClientName(admin, source, sizeof(source));
 
 	int buffer_len = strlen(steam_id) * 2 + 1;
 	char[] v_steam_id = new char[buffer_len];
