@@ -10,7 +10,7 @@ public Plugin myinfo = {
 	url = "https://forums.alliedmods.net/showthread.php?p=1759904"
 };
 
-Handle hDatabase = null;
+Database connection = null;
 
 public void OnPluginStart()
 {
@@ -59,15 +59,18 @@ bool VerifyTable()
 
 void StartSQL()
 {
-	SQL_TConnect(GotDatabase);
+	if(SQL_CheckConfig("threaded-bans"))
+		Database.Connect(ConnectedToDatabase, "threaded-bans");
+	else
+		Database.Connect(ConnectedToDatabase, "default");
 }
 
-public void GotDatabase(Handle owner, Handle hndl, const char[] error, any data)
+public void ConnectedToDatabase(Database database, const char[] error, any data)
 {
-	if (hndl == null)
-		LogError("[MYBans] Database Connection Error: %s", error);
+	if (database == null)
+		LogError("[MYBans] Error during connection to database: %s", error);
 	else
-		hDatabase = hndl;
+		connection = database;
 }
 
 public void OnClientPostAdminCheck(int client)
@@ -82,13 +85,13 @@ public void OnClientPostAdminCheck(int client)
 
 	int buffer_len = strlen(steam_id) * 2 + 1;
 	char[] v_steam_id = new char[buffer_len];
-	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
+	connection.Escape(steam_id, v_steam_id, buffer_len);
 
 	Format(query, sizeof(query), "SELECT ban_length, ban_reason, (now()-timestamp)/60 FROM my_bans WHERE steam_id = '%s';", v_steam_id);
-	SQL_TQuery(hDatabase, T_AuthCheck, query, GetClientUserId(client));
+	connection.Query(ClientChecked, query, GetClientUserId(client));
 }
 
-public void T_AuthCheck(Handle owner, Handle hndl, const char[] error, any data)
+public void ClientChecked(Database database, DBResultSet result, const char[] error, any data)
 {
 	int client;
 	int ban_length;
@@ -104,24 +107,24 @@ public void T_AuthCheck(Handle owner, Handle hndl, const char[] error, any data)
 
 	int buffer_len = strlen(steam_id) * 2 + 1;
 	char[] v_steam_id = new char[buffer_len];
-	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
+	connection.Escape(steam_id, v_steam_id, buffer_len);
 
-	if (hndl == null)
+	if (result == null)
 	{
 		LogError("[MYBans] Query failed! %s", error);
 		KickClient(client, "Error: Reattempt connection");
 	}
 
-	if(!SQL_FetchRow(hndl))
+	if(!result.FetchRow())
 		return;
 
-	ban_length = SQL_FetchInt(hndl, 0);
-	SQL_FetchString(hndl, 1, ban_reason, sizeof(ban_reason));
+	ban_length = result.FetchInt(0);
+	result.FetchString(1, ban_reason, sizeof(ban_reason));
 
 	if (ban_length == 0)
 		ban_remaining = 0;
 	else
-		ban_remaining = ban_length - SQL_FetchInt(hndl,2);
+		ban_remaining = ban_length - result.FetchInt(2);
 
 	if (ban_length == 0 || ban_remaining > 0)
 	{
@@ -132,7 +135,7 @@ public void T_AuthCheck(Handle owner, Handle hndl, const char[] error, any data)
 	else
 	{
 		Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s';", v_steam_id);
-		SQL_TQuery(hDatabase, T_MYUnBan, query);
+		connection.Query(ClientUnbanned, query);
 		LogAction(0, 0, "Allowing %L to connect. Ban has expired.", client);
 	}
 }
@@ -145,9 +148,9 @@ void GetDurationString(char[] duration_string, int duration_string_size, int dur
 		Format(duration_string, duration_string_size, "%d %s", duration, (duration == 1) ? "minute" : "minutes");
 }
 
-public void T_MYUnBan(Handle owner, Handle hndl, const char[] error, any data)
+public void ClientUnbanned(Database database, DBResultSet result, const char[] error, any data)
 {
-	if (hndl == null)
+	if (result == null)
 		LogError("[MYBans] Query failed! %s", error);
 }
 
@@ -232,27 +235,27 @@ void MyBanClient(const char[] steam_id, const char[] player_name, int time, cons
 
 	int buffer_len = strlen(steam_id) * 2 + 1;
 	char[] v_steam_id = new char[buffer_len];
-	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
+	connection.Escape(steam_id, v_steam_id, buffer_len);
 
 	buffer_len = strlen(reason) * 2 + 1;
 	char[] v_reason = new char[buffer_len];
-	SQL_EscapeString(hDatabase, reason, v_reason, buffer_len);
+	connection.Escape(reason, v_reason, buffer_len);
 
 	buffer_len = strlen(source) * 2 + 1;
 	char[] v_source = new char[buffer_len];
-	SQL_EscapeString(hDatabase, source, v_source, buffer_len);
+	connection.Escape(source, v_source, buffer_len);
 
 	buffer_len = strlen(player_name) * 2 + 1;
 	char[] v_player_name = new char[buffer_len];
-	SQL_EscapeString(hDatabase, player_name, v_player_name, buffer_len);
+	connection.Escape(player_name, v_player_name, buffer_len);
 
 	Format(query, sizeof(query), "REPLACE INTO my_bans (player_name, steam_id, ban_length, ban_reason, banned_by, timestamp) VALUES ('%s','%s','%d','%s','%s',CURRENT_TIMESTAMP);", v_player_name, v_steam_id, time, v_reason, v_source);
-	SQL_TQuery(hDatabase, T_MYBan, query);
+	connection.Query(ClientBanned, query);
 }
 
-public void T_MYBan(Handle owner, Handle hndl, const char[] error, any data)
+public void ClientBanned(Database database, DBResultSet result, const char[] error, any data)
 {
-	if (hndl == null)
+	if (result == null)
 		LogError("[MYBans] Query failed! %s", error);
 }
 
@@ -262,10 +265,10 @@ public Action OnRemoveBan(const char[] steam_id, int flags, const char[] command
 
 	int buffer_len = strlen(steam_id) * 2 + 1;
 	char[] v_steam_id = new char[buffer_len];
-	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
+	connection.Escape(steam_id, v_steam_id, buffer_len);
 
 	Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s';", v_steam_id);
-	SQL_TQuery(hDatabase, T_MYUnBan, query);
+	connection.Query(ClientUnbanned, query);
 
 	ReplyToCommand(admin, "[MYBans] User %s has been unbanned", steam_id);
 	LogAction(admin, 0, "%L unbanned Steam ID %s.", admin, steam_id);
