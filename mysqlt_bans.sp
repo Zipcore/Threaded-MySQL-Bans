@@ -67,82 +67,83 @@ public void DatabaseCreated(Database database, DBResultSet result, const char[] 
 
 public void OnClientPostAdminCheck(int client)
 {
+	CheckBanStateOfClient(client);
+}
+
+void CheckBanStateOfClient(int client)
+{
 	if(IsFakeClient(client))
 		return;
 
-	char steam_id[32];
+	char steamId[32];
+	GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId));
+
+	int steamIdLength = strlen(steamId) * 2 + 1;
+	char[] escapedSteamId = new char[steamIdLength];
+	connection.Escape(steamId, escapedSteamId, steamIdLength);
+
 	char query[255];
+	Format(query, sizeof(query), "SELECT ban_length, (now()-timestamp)/60, ban_reason FROM my_bans WHERE steam_id = '%s';", escapedSteamId);
 
-	GetClientAuthId(client, AuthId_Steam2, steam_id, sizeof(steam_id));
-
-	int buffer_len = strlen(steam_id) * 2 + 1;
-	char[] v_steam_id = new char[buffer_len];
-	connection.Escape(steam_id, v_steam_id, buffer_len);
-
-	Format(query, sizeof(query), "SELECT ban_length, ban_reason, (now()-timestamp)/60 FROM my_bans WHERE steam_id = '%s';", v_steam_id);
-	connection.Query(ClientChecked, query, GetClientUserId(client));
+	connection.Query(BanStateOfClientChecked, query, client);
 }
 
-public void ClientChecked(Database database, DBResultSet result, const char[] error, any data)
+public void BanStateOfClientChecked(Database database, DBResultSet result, const char[] error, any data)
 {
-	int client;
-	int ban_length;
-	int ban_remaining;
-	char steam_id[32];
-	char ban_reason[100];
-	char query[255];
-
-	if ((client = GetClientOfUserId(data)) == 0)
+	int client = data;
+	if(client <= 0)
 		return;
 
-	GetClientAuthId(client, AuthId_Steam2, steam_id, sizeof(steam_id));
-
-	int buffer_len = strlen(steam_id) * 2 + 1;
-	char[] v_steam_id = new char[buffer_len];
-	connection.Escape(steam_id, v_steam_id, buffer_len);
-
-	if (result == null)
-	{
-		LogError("[MYBans] Query failed! %s", error);
+	if(result == null || !result.FetchRow()) {
+		LogError("[MYBans] Error during check of ban state for client %L: %s", client, error);
 		KickClient(client, "Error: Reattempt connection");
 	}
 
-	if(!result.FetchRow())
-		return;
+	int banLength = result.FetchInt(0);
+	int minutesSinceBan = result.FetchInt(1);
+	int timeRemaining = banLength - minutesSinceBan;
 
-	ban_length = result.FetchInt(0);
-	result.FetchString(1, ban_reason, sizeof(ban_reason));
+	if(banLength == 0 || timeRemaining > 0) {
+		char durationAsString[60];
+		DurationAsString(durationAsString, sizeof(durationAsString), timeRemaining);
 
-	if (ban_length == 0)
-		ban_remaining = 0;
-	else
-		ban_remaining = ban_length - result.FetchInt(2);
+		char banReason[100];
+		result.FetchString(2, banReason, sizeof(banReason));
 
-	if (ban_length == 0 || ban_remaining > 0)
-	{
-		char duration_string[60];
-		GetDurationString(duration_string, sizeof(duration_string), ban_remaining);
-		KickClient(client, "Banned (%s): %s", duration_string, ban_reason);
+		KickClient(client, "Banned (%s): %s", durationAsString, banReason);
 	}
-	else
-	{
-		Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s';", v_steam_id);
-		connection.Query(ClientUnbanned, query);
+	else {
+		RemoveBanOf(client);
 		LogAction(0, 0, "Allowing %L to connect. Ban has expired.", client);
 	}
 }
 
-void GetDurationString(char[] duration_string, int duration_string_size, int duration)
+void DurationAsString(char[] buffer, int maxLength, int duration)
 {
-	if (duration == 0)
-		strcopy(duration_string, duration_string_size, "permanently");
+	if(duration == 0)
+		strcopy(buffer, maxLength, "permanently");
 	else
-		Format(duration_string, duration_string_size, "%d %s", duration, (duration == 1) ? "minute" : "minutes");
+		Format(buffer, maxLength, "%d %s", duration, (duration == 1) ? "minute" : "minutes");
+}
+
+void RemoveBanOf(int client)
+{
+	char steamId[32];
+	GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId));
+
+	int steamIdlength = strlen(steamId) * 2 + 1;
+	char[] escapedSteamId = new char[steamIdlength];
+	connection.Escape(steamId, escapedSteamId, steamIdlength);
+
+	char query[255];
+	Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s';", escapedSteamId);
+
+	connection.Query(ClientUnbanned, query);
 }
 
 public void ClientUnbanned(Database database, DBResultSet result, const char[] error, any data)
 {
-	if (result == null)
+	if(result == null)
 		LogError("[MYBans] Query failed! %s", error);
 }
 
@@ -157,7 +158,7 @@ public Action OnBanClient(int client, int time, int flags, const char[] reason, 
 	MyBanClient(steam_id, player_name, time, reason, admin);
 
 	char duration_string[60];
-	GetDurationString(duration_string, sizeof(duration_string), time);
+	DurationAsString(duration_string, sizeof(duration_string), time);
 
 	KickClient(client, "Banned (%s): %s", duration_string, reason);
 	LogAction(admin, client, "%L banned %L (%s): %s", admin, client, duration_string, reason);
@@ -205,7 +206,7 @@ public Action OnAddBan(int client, const char[] command, int argc)
 	int time = StringToInt(time_string);
 
 	char duration_string[60];
-	GetDurationString(duration_string, sizeof(duration_string), time);
+	DurationAsString(duration_string, sizeof(duration_string), time);
 
 	MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client);
 
