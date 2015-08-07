@@ -20,12 +20,41 @@ public void OnPluginStart()
 	AddCommandListener(OnAddBan, "sm_addban");
 }
 
-void GetDurationString(char[] duration_string, int duration_string_size, int duration)
+bool VerifyTable()
 {
-	if (duration == 0)
-		strcopy(duration_string, duration_string_size, "permanently");
-	else
-		Format(duration_string, duration_string_size, "%d %s", duration, (duration == 1) ? "minute" : "minutes");
+	char error[255];
+	char query[512];
+
+	Handle db = SQL_Connect("default", true, error, sizeof(error));
+	if (db == null)
+	{
+		LogError("[MYBans] Couldn't connect to database! Error: %s", error);
+		return false;
+	}
+
+	Format(query,sizeof(query), "%s%s%s%s%s%s%s%s%s%s%s",
+		"CREATE TABLE IF NOT EXISTS `my_bans` (",
+		"	`id` int(11) NOT NULL auto_increment,",
+		"	`steam_id` varchar(32) NOT NULL,",
+		"	`player_name` varchar(65) NOT NULL,",
+		"	`ban_length` int(1) NOT NULL default '0',",
+		"	`ban_reason` varchar(100) NOT NULL,",
+		"	`banned_by` varchar(100) NOT NULL,",
+		"	`timestamp` timestamp NOT NULL default '0000-00-00 00:00:00' on update CURRENT_TIMESTAMP,",
+		"	PRIMARY KEY	(`id`),",
+		"	UNIQUE KEY `steam_id` (`steam_id`)",
+		") ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;"
+	);
+
+	bool success = SQL_FastQuery(db, query);
+	if(!success)
+	{
+			SQL_GetError(db, error, sizeof(error));
+			LogError("[MYBans] Unable to verify mysql_bans table! Error: %s", query);
+	}
+
+	delete db;
+	return true;
 }
 
 void StartSQL()
@@ -39,6 +68,24 @@ public void GotDatabase(Handle owner, Handle hndl, const char[] error, any data)
 		LogError("[MYBans] Database Connection Error: %s", error);
 	else
 		hDatabase = hndl;
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+	if(IsFakeClient(client))
+		return;
+
+	char steam_id[32];
+	char query[255];
+
+	GetClientAuthId(client, AuthId_Steam2, steam_id, sizeof(steam_id));
+
+	int buffer_len = strlen(steam_id) * 2 + 1;
+	char[] v_steam_id = new char[buffer_len];
+	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
+
+	Format(query, sizeof(query), "SELECT ban_length, ban_reason, (now()-timestamp)/60 FROM my_bans WHERE steam_id = '%s';", v_steam_id);
+	SQL_TQuery(hDatabase, T_AuthCheck, query, GetClientUserId(client));
 }
 
 public void T_AuthCheck(Handle owner, Handle hndl, const char[] error, any data)
@@ -90,64 +137,18 @@ public void T_AuthCheck(Handle owner, Handle hndl, const char[] error, any data)
 	}
 }
 
-public void T_MYBan(Handle owner, Handle hndl, const char[] error, any data)
+void GetDurationString(char[] duration_string, int duration_string_size, int duration)
 {
-	if (hndl == null)
-		LogError("[MYBans] Query failed! %s", error);
+	if (duration == 0)
+		strcopy(duration_string, duration_string_size, "permanently");
+	else
+		Format(duration_string, duration_string_size, "%d %s", duration, (duration == 1) ? "minute" : "minutes");
 }
 
 public void T_MYUnBan(Handle owner, Handle hndl, const char[] error, any data)
 {
 	if (hndl == null)
 		LogError("[MYBans] Query failed! %s", error);
-}
-
-public void OnClientPostAdminCheck(int client)
-{
-	if(IsFakeClient(client))
-		return;
-
-	char steam_id[32];
-	char query[255];
-
-	GetClientAuthId(client, AuthId_Steam2, steam_id, sizeof(steam_id));
-
-	int buffer_len = strlen(steam_id) * 2 + 1;
-	char[] v_steam_id = new char[buffer_len];
-	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
-
-	Format(query, sizeof(query), "SELECT ban_length, ban_reason, (now()-timestamp)/60 FROM my_bans WHERE steam_id = '%s';", v_steam_id);
-	SQL_TQuery(hDatabase, T_AuthCheck, query, GetClientUserId(client));
-}
-
-void MyBanClient(const char[] steam_id, const char[] player_name, int time, const char[] reason, int admin)
-{
-	char query[255];
-	char source[100];
-
-	if(admin == 0)
-		source = "Console";
-	else
-		GetClientName(admin, source, sizeof(source));
-
-	int buffer_len = strlen(steam_id) * 2 + 1;
-	char[] v_steam_id = new char[buffer_len];
-	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
-
-	buffer_len = strlen(reason) * 2 + 1;
-	char[] v_reason = new char[buffer_len];
-	SQL_EscapeString(hDatabase, reason, v_reason, buffer_len);
-
-	buffer_len = strlen(source) * 2 + 1;
-	char[] v_source = new char[buffer_len];
-	SQL_EscapeString(hDatabase, source, v_source, buffer_len);
-
-	buffer_len = strlen(player_name) * 2 + 1;
-	char[] v_player_name = new char[buffer_len];
-	SQL_EscapeString(hDatabase, player_name, v_player_name, buffer_len);
-
-	Format(query, sizeof(query), "REPLACE INTO my_bans (player_name, steam_id, ban_length, ban_reason, banned_by, timestamp) VALUES ('%s','%s','%d','%s','%s',CURRENT_TIMESTAMP);", v_player_name, v_steam_id, time, v_reason, v_source);
-	SQL_TQuery(hDatabase, T_MYBan, query);
 }
 
 public Action OnBanClient(int client, int time, int flags, const char[] reason, const char[] kick_message, const char[] command, any admin)
@@ -219,6 +220,42 @@ public Action OnAddBan(int client, const char[] command, int argc)
 	return Plugin_Continue;
 }
 
+void MyBanClient(const char[] steam_id, const char[] player_name, int time, const char[] reason, int admin)
+{
+	char query[255];
+	char source[100];
+
+	if(admin == 0)
+		source = "Console";
+	else
+		GetClientName(admin, source, sizeof(source));
+
+	int buffer_len = strlen(steam_id) * 2 + 1;
+	char[] v_steam_id = new char[buffer_len];
+	SQL_EscapeString(hDatabase, steam_id, v_steam_id, buffer_len);
+
+	buffer_len = strlen(reason) * 2 + 1;
+	char[] v_reason = new char[buffer_len];
+	SQL_EscapeString(hDatabase, reason, v_reason, buffer_len);
+
+	buffer_len = strlen(source) * 2 + 1;
+	char[] v_source = new char[buffer_len];
+	SQL_EscapeString(hDatabase, source, v_source, buffer_len);
+
+	buffer_len = strlen(player_name) * 2 + 1;
+	char[] v_player_name = new char[buffer_len];
+	SQL_EscapeString(hDatabase, player_name, v_player_name, buffer_len);
+
+	Format(query, sizeof(query), "REPLACE INTO my_bans (player_name, steam_id, ban_length, ban_reason, banned_by, timestamp) VALUES ('%s','%s','%d','%s','%s',CURRENT_TIMESTAMP);", v_player_name, v_steam_id, time, v_reason, v_source);
+	SQL_TQuery(hDatabase, T_MYBan, query);
+}
+
+public void T_MYBan(Handle owner, Handle hndl, const char[] error, any data)
+{
+	if (hndl == null)
+		LogError("[MYBans] Query failed! %s", error);
+}
+
 public Action OnRemoveBan(const char[] steam_id, int flags, const char[] command, any admin)
 {
 	char query[255];
@@ -234,41 +271,4 @@ public Action OnRemoveBan(const char[] steam_id, int flags, const char[] command
 	LogAction(admin, 0, "%L unbanned Steam ID %s.", admin, steam_id);
 
 	return Plugin_Continue;
-}
-
-bool VerifyTable()
-{
-	char error[255];
-	char query[512];
-
-	Handle db = SQL_Connect("default", true, error, sizeof(error));
-	if (db == null)
-	{
-		LogError("[MYBans] Couldn't connect to database! Error: %s", error);
-		return false;
-	}
-
-	Format(query,sizeof(query), "%s%s%s%s%s%s%s%s%s%s%s",
-		"CREATE TABLE IF NOT EXISTS `my_bans` (",
-		"	`id` int(11) NOT NULL auto_increment,",
-		"	`steam_id` varchar(32) NOT NULL,",
-		"	`player_name` varchar(65) NOT NULL,",
-		"	`ban_length` int(1) NOT NULL default '0',",
-		"	`ban_reason` varchar(100) NOT NULL,",
-		"	`banned_by` varchar(100) NOT NULL,",
-		"	`timestamp` timestamp NOT NULL default '0000-00-00 00:00:00' on update CURRENT_TIMESTAMP,",
-		"	PRIMARY KEY	(`id`),",
-		"	UNIQUE KEY `steam_id` (`steam_id`)",
-		") ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;"
-	);
-
-	bool success = SQL_FastQuery(db, query);
-	if(!success)
-	{
-			SQL_GetError(db, error, sizeof(error));
-			LogError("[MYBans] Unable to verify mysql_bans table! Error: %s", query);
-	}
-
-	delete db;
-	return true;
 }
