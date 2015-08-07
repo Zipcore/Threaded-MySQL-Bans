@@ -14,23 +14,33 @@ Database connection = null;
 
 public void OnPluginStart()
 {
-	VerifyTable();
-	StartSQL();
 	CreateConVar("sm_mybans_version", PLUGIN_VERSION, "MYSQL-T Bans Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	AddCommandListener(OnAddBan, "sm_addban");
+
+	StartSQL();
 }
 
-bool VerifyTable()
+void StartSQL()
 {
-	char error[255];
-	char query[512];
+	if(SQL_CheckConfig("threaded-bans"))
+		Database.Connect(ConnectedToDatabase, "threaded-bans");
+	else
+		Database.Connect(ConnectedToDatabase, "default");
+}
 
-	Handle db = SQL_Connect("default", true, error, sizeof(error));
-	if (db == null)
-	{
-		LogError("[MYBans] Couldn't connect to database! Error: %s", error);
-		return false;
+public void ConnectedToDatabase(Database database, const char[] error, any data)
+{
+	if (database == null)
+		LogError("[MYBans] Error during connection to database: %s", error);
+	else {
+		connection = database;
+		CreateTableIfNotExists();
 	}
+}
+
+void CreateTableIfNotExists()
+{
+	char query[512];
 
 	Format(query,sizeof(query), "%s%s%s%s%s%s%s%s%s%s%s",
 		"CREATE TABLE IF NOT EXISTS `my_bans` (",
@@ -46,31 +56,13 @@ bool VerifyTable()
 		") ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;"
 	);
 
-	bool success = SQL_FastQuery(db, query);
-	if(!success)
-	{
-			SQL_GetError(db, error, sizeof(error));
-			LogError("[MYBans] Unable to verify mysql_bans table! Error: %s", query);
-	}
-
-	delete db;
-	return true;
+	connection.Query(DatabaseCreated, query);
 }
 
-void StartSQL()
+public void DatabaseCreated(Database database, DBResultSet result, const char[] error, any data)
 {
-	if(SQL_CheckConfig("threaded-bans"))
-		Database.Connect(ConnectedToDatabase, "threaded-bans");
-	else
-		Database.Connect(ConnectedToDatabase, "default");
-}
-
-public void ConnectedToDatabase(Database database, const char[] error, any data)
-{
-	if (database == null)
-		LogError("[MYBans] Error during connection to database: %s", error);
-	else
-		connection = database;
+	if(result == null)
+		LogError("[MYBans] Error during table creation: %s", error);
 }
 
 public void OnClientPostAdminCheck(int client)
