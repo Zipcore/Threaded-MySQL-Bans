@@ -149,106 +149,83 @@ public void ClientUnbanned(Database database, DBResultSet result, const char[] e
 
 public Action OnBanClient(int client, int time, int flags, const char[] reason, const char[] kick_message, const char[] command, any admin)
 {
-	char steam_id[32];
-	char player_name[65];
+	char steamId[32];
+	GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId));
 
-	GetClientAuthId(client, AuthId_Steam2, steam_id, sizeof(steam_id));
-	GetClientName(client, player_name, sizeof(player_name));
+	char playerName[65];
+	GetClientName(client, playerName, sizeof(playerName));
 
-	MyBanClient(steam_id, player_name, time, reason, admin);
-
-	char duration_string[60];
-	DurationAsString(duration_string, sizeof(duration_string), time);
-
-	KickClient(client, "Banned (%s): %s", duration_string, reason);
-	LogAction(admin, client, "%L banned %L (%s): %s", admin, client, duration_string, reason);
+	AddBanFor(playerName, steamId, time, reason, admin);
 
 	return Plugin_Continue;
 }
 
-public Action OnAddBan(int client, const char[] command, int argc)
+public Action OnAddBan(int admin, const char[] command, int argc)
 {
-	if (!CheckCommandAccess(client, "sm_addban", ADMFLAG_BAN))
+	if(!CheckCommandAccess(admin, "sm_addban", ADMFLAG_BAN))
 		return Plugin_Handled;
 
-	if (argc < 2)
-	{
-		PrintToChat(client, "[SM] Usage: %s <minutes|0> <#userid|name> [reason]", command);
+	if(argc < 2) {
+		PrintToChat(admin, "[SM] Usage: %s <minutes|0> <#userid|name> [reason]", command);
 		return Plugin_Handled;
 	}
 
 	char arguments[256];
 	GetCmdArgString(arguments, sizeof(arguments));
 
-	char time_string[10];
-	int len = BreakString(arguments, time_string, sizeof(time_string));
+	char banLengthAsString[10];
+	int nextArgumentPosition = BreakString(arguments, banLengthAsString, sizeof(banLengthAsString));
 
-	char steam_id[32];
-	int next_len = BreakString(arguments[len], steam_id, sizeof(steam_id));
-	if (next_len != -1)
-		len += next_len;
-	else
-	{
-		len = 0;
-		arguments[0] = '\0';
-	}
+	int banLength = StringToInt(banLengthAsString);
 
-	char ban_reason[100];
-	next_len = BreakString(arguments[len], ban_reason, sizeof(ban_reason));
-	if (next_len != -1)
-		len += next_len;
-	else
-	{
-		len = 0;
-		arguments[0] = '\0';
-	}
+	char steamId[32];
+	nextArgumentPosition = BreakString(arguments[nextArgumentPosition], steamId, sizeof(steamId));
 
-	int time = StringToInt(time_string);
+	char reason[100];
+	strcopy(arguments[nextArgumentPosition], sizeof(reason), reason);
 
-	char duration_string[60];
-	DurationAsString(duration_string, sizeof(duration_string), time);
-
-	MyBanClient(steam_id, "(sm_addban)", time, ban_reason, client);
-
-	LogAction(client, 0, "%L banned Steam ID %s (%s): %s", client, steam_id, duration_string, ban_reason);
-	ReplyToCommand(client, "[MYBans] Banned Steam ID %s (%s): %s", steam_id, duration_string, ban_reason);
-
+	AddBanFor("", steamId, banLength, reason, admin);
 	return Plugin_Continue;
 }
 
-void MyBanClient(const char[] steam_id, const char[] player_name, int time, const char[] reason, int admin)
+void AddBanFor(const char[] playerName, const char[] steamId, int banLength, const char[] reason, int admin)
 {
-	char query[255];
-	char source[100];
+	int stringLength = strlen(playerName) * 2 + 1;
+	char[] escapedPlayerName = new char[stringLength];
+	connection.Escape(playerName, escapedPlayerName, stringLength);
 
+	stringLength = strlen(steamId) * 2 + 1;
+	char[] escapedSteamId = new char[stringLength];
+	connection.Escape(steamId, escapedSteamId, stringLength);
+
+	stringLength = strlen(reason) * 2 + 1;
+	char[] escapedReason = new char[stringLength];
+	connection.Escape(reason, escapedReason, stringLength);
+
+	char adminName[100];
 	if(admin == 0)
-		source = "Console";
+		adminName = "Console";
 	else
-		GetClientName(admin, source, sizeof(source));
+		GetClientName(admin, adminName, sizeof(adminName));
 
-	int buffer_len = strlen(steam_id) * 2 + 1;
-	char[] v_steam_id = new char[buffer_len];
-	connection.Escape(steam_id, v_steam_id, buffer_len);
+	stringLength = strlen(adminName) * 2 + 1;
+	char[] escapedAdminName = new char[stringLength];
+	connection.Escape(adminName, escapedAdminName, stringLength);
 
-	buffer_len = strlen(reason) * 2 + 1;
-	char[] v_reason = new char[buffer_len];
-	connection.Escape(reason, v_reason, buffer_len);
-
-	buffer_len = strlen(source) * 2 + 1;
-	char[] v_source = new char[buffer_len];
-	connection.Escape(source, v_source, buffer_len);
-
-	buffer_len = strlen(player_name) * 2 + 1;
-	char[] v_player_name = new char[buffer_len];
-	connection.Escape(player_name, v_player_name, buffer_len);
-
-	Format(query, sizeof(query), "REPLACE INTO my_bans (player_name, steam_id, ban_length, ban_reason, banned_by, timestamp) VALUES ('%s','%s','%d','%s','%s',CURRENT_TIMESTAMP);", v_player_name, v_steam_id, time, v_reason, v_source);
+	char query[255];
+	Format(query, sizeof(query), "REPLACE INTO my_bans (player_name, steam_id, ban_length, ban_reason, banned_by, timestamp) VALUES ('%s','%s','%d','%s','%s',CURRENT_TIMESTAMP);", escapedPlayerName, escapedSteamId, banLength, escapedReason, escapedAdminName);
 	connection.Query(ClientBanned, query);
+
+	char durationAsString[32];
+	DurationAsString(durationAsString, sizeof(durationAsString), banLength);
+
+	LogAction(admin, 0, "%L banned Steam ID %s (%s): %s", admin, steamId, durationAsString, reason);
+	ReplyToCommand(admin, "[MYBans] Banned Steam ID %s (%s): %s", steamId, durationAsString, reason);
 }
 
 public void ClientBanned(Database database, DBResultSet result, const char[] error, any data)
 {
-	if (result == null)
+	if(result == null)
 		LogError("[MYBans] Query failed! %s", error);
 }
 
