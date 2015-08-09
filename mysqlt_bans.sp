@@ -113,7 +113,10 @@ public void BanStateOfClientChecked(Database database, DBResultSet result, const
 		KickClient(client, "Banned (%s): %s", durationAsString, banReason);
 	}
 	else {
-		RemoveBanOf(client);
+		char steamId[32];
+		GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId));
+
+		RemoveBanOf(steamId);
 		LogAction(0, 0, "Allowing %L to connect. Ban has expired.", client);
 	}
 }
@@ -126,11 +129,8 @@ void DurationAsString(char[] buffer, int maxLength, int duration)
 		Format(buffer, maxLength, "%d %s", duration, (duration == 1) ? "minute" : "minutes");
 }
 
-void RemoveBanOf(int client)
+void RemoveBanOf(const char[] steamId)
 {
-	char steamId[32];
-	GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId));
-
 	int steamIdlength = strlen(steamId) * 2 + 1;
 	char[] escapedSteamId = new char[steamIdlength];
 	connection.Escape(steamId, escapedSteamId, steamIdlength);
@@ -252,19 +252,12 @@ public void ClientBanned(Database database, DBResultSet result, const char[] err
 		LogError("[MYBans] Query failed! %s", error);
 }
 
-public Action OnRemoveBan(const char[] steam_id, int flags, const char[] command, any admin)
+public Action OnRemoveBan(const char[] steamId, int flags, const char[] command, any admin)
 {
-	char query[255];
+	RemoveBanOf(steamId);
 
-	int buffer_len = strlen(steam_id) * 2 + 1;
-	char[] v_steam_id = new char[buffer_len];
-	connection.Escape(steam_id, v_steam_id, buffer_len);
-
-	Format(query, sizeof(query), "DELETE FROM my_bans WHERE steam_id='%s';", v_steam_id);
-	connection.Query(ClientUnbanned, query);
-
-	ReplyToCommand(admin, "[MYBans] User %s has been unbanned", steam_id);
-	LogAction(admin, 0, "%L unbanned Steam ID %s.", admin, steam_id);
+	ReplyToCommand(admin, "[MYBans] User %s has been unbanned", steamId);
+	LogAction(admin, 0, "%L unbanned Steam ID %s.", admin, steamId);
 
 	return Plugin_Continue;
 }
