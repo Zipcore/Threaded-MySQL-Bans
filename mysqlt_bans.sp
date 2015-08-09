@@ -52,15 +52,15 @@ void CreateTableIfNotExists()
 
 	Format(query,sizeof(query), "%s%s%s%s%s%s%s%s%s%s%s",
 		"CREATE TABLE IF NOT EXISTS `my_bans` (",
-		"	`id` int(11) NOT NULL auto_increment,",
-		"	`steam_id` varchar(32) NOT NULL,",
-		"	`player_name` varchar(65) NOT NULL,",
-		"	`ban_length` int(1) NOT NULL default '0',",
-		"	`ban_reason` varchar(100) NOT NULL,",
-		"	`banned_by` varchar(100) NOT NULL,",
-		"	`timestamp` timestamp NOT NULL default '0000-00-00 00:00:00' on update CURRENT_TIMESTAMP,",
-		"	PRIMARY KEY	(`id`),",
-		"	UNIQUE KEY `steam_id` (`steam_id`)",
+			"`id` int(11) NOT NULL auto_increment,",
+			"`steam_id` varchar(32) NOT NULL,",
+			"`player_name` varchar(65) NOT NULL,",
+			"`ban_length` int(1) NOT NULL default '0',",
+			"`ban_reason` varchar(100) NOT NULL,",
+			"`banned_by` varchar(100) NOT NULL,",
+			"`timestamp` timestamp NOT NULL default CURRENT_TIMESTAMP,",
+			"PRIMARY KEY	(`id`),",
+			"UNIQUE KEY `steam_id` (`steam_id`)",
 		") ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;"
 	);
 
