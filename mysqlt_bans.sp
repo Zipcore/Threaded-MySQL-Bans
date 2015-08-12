@@ -187,6 +187,8 @@ public void BanStateOfClientChecked(Database database, DBResultSet result, const
 	if(result == null || !result.FetchRow()) {
 		LogError("[MYBans] Error during check of ban state for client %L: %s", client, error);
 		KickClient(client, "Error: Reattempt connection");
+
+		return;
 	}
 
 	int banLength = result.FetchInt(0);
