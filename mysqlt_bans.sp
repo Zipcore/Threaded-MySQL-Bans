@@ -184,13 +184,17 @@ public void BanStateOfClientChecked(Database database, DBResultSet result, const
 	if(client <= 0)
 		return;
 
-	if(result == null || !result.FetchRow()) {
+	if(result == null) {
 		LogError("[MYBans] Error during check of ban state for client %L: %s", client, error);
 		KickClient(client, "Error: Reattempt connection");
 
 		return;
 	}
 
+	if(result.RowCount <= 0)
+		return;
+
+	result.FetchRow();
 	int banLength = result.FetchInt(0);
 	int minutesSinceBan = result.FetchInt(1);
 	int timeRemaining = banLength - minutesSinceBan;
