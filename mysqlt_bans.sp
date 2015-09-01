@@ -92,20 +92,20 @@ public Action OnAddBan(int admin, const char[] command, int argc)
 		return Plugin_Handled;
 
 	if(argc < 2) {
-		PrintToChat(admin, "[SM] Usage: %s <minutes|0> <#userid|name> [reason]", command);
+		PrintToChat(admin, "[SM] Usage: %s <SteamId> <minutes|0> [reason]", command);
 		return Plugin_Handled;
 	}
 
 	char arguments[256];
 	GetCmdArgString(arguments, sizeof(arguments));
 
+	char steamId[MAX_AUTH_LENGTH];
+	int nextArgumentPosition = BreakString(arguments[nextArgumentPosition], steamId, sizeof(steamId));
+
 	char banLengthAsString[10];
-	int nextArgumentPosition = BreakString(arguments, banLengthAsString, sizeof(banLengthAsString));
+	nextArgumentPosition = BreakString(arguments, banLengthAsString, sizeof(banLengthAsString));
 
 	int banLength = StringToInt(banLengthAsString);
-
-	char steamId[MAX_AUTH_LENGTH];
-	nextArgumentPosition = BreakString(arguments[nextArgumentPosition], steamId, sizeof(steamId));
 
 	char reason[MAX_REASON_LENGTH];
 	strcopy(arguments[nextArgumentPosition], sizeof(reason), reason);
