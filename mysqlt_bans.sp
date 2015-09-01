@@ -173,7 +173,7 @@ void CheckBanStateOfClient(int client)
 	connection.Escape(steamId, escapedSteamId, steamIdLength);
 
 	char query[MAX_QUERY_LENGTH];
-	Format(query, sizeof(query), "SELECT ban_length, (now()-timestamp)/60, ban_reason FROM my_bans WHERE steam_id = '%s';", escapedSteamId);
+	Format(query, sizeof(query), "SELECT ban_length, TIMESTAMPDIFF(SQL_TSI_MINUTE, timestamp, CURRENT_TIMESTAMP), ban_reason FROM my_bans WHERE steam_id = '%s';", escapedSteamId);
 
 	connection.Query(BanStateOfClientChecked, query, client);
 }
@@ -196,10 +196,14 @@ public void BanStateOfClientChecked(Database database, DBResultSet result, const
 
 	result.FetchRow();
 	int banLength = result.FetchInt(0);
-	int minutesSinceBan = result.FetchInt(1);
-	int timeRemaining = banLength - minutesSinceBan;
+	int timeRemaining = 0;
 
-	if(banLength == 0 || timeRemaining > 0) {
+	if(banLength > 0) {
+		int minutesSinceBan = result.FetchInt(1);
+		timeRemaining = banLength - minutesSinceBan;
+	}
+
+	if(timeRemaining > 0) {
 		char durationAsString[MAX_DURATION_LENGTH];
 		DurationAsString(durationAsString, sizeof(durationAsString), timeRemaining);
 
