@@ -196,14 +196,11 @@ public void BanStateOfClientChecked(Database database, DBResultSet result, const
 
 	result.FetchRow();
 	int banLength = result.FetchInt(0);
-	int timeRemaining = 0;
 
-	if(banLength > 0) {
-		int minutesSinceBan = result.FetchInt(1);
-		timeRemaining = banLength - minutesSinceBan;
-	}
+	int minutesSinceBan = result.FetchInt(1);
+	int timeRemaining = banLength - minutesSinceBan;
 
-	if(timeRemaining > 0) {
+	if(banLength == 0 || timeRemaining > 0) {
 		char durationAsString[MAX_DURATION_LENGTH];
 		DurationAsString(durationAsString, sizeof(durationAsString), timeRemaining);
 
