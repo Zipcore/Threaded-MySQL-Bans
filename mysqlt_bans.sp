@@ -1,7 +1,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.4"
+#define PLUGIN_VERSION "1.4.1"
 
 #define MAX_QUERY_LENGTH 255
 #define BIG_QUERY_LENGTH 512
