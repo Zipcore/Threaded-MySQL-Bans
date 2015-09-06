@@ -12,7 +12,7 @@
 
 public Plugin myinfo = {
 	name = "[ANY] MySQL-T Bans",
-	author = "senseless | enhanced by sneakret | modified by Shadow_Man",
+	author = "senseless | modified by Shadow_Man",
 	description = "Threaded SteamID based mysql bans.",
 	version = PLUGIN_VERSION,
 	url = "https://forums.alliedmods.net/showthread.php?p=1759904"
