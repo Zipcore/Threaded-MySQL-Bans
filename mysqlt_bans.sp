@@ -175,12 +175,11 @@ void CheckBanStateOfClient(int client)
 	char query[MAX_QUERY_LENGTH];
 	Format(query, sizeof(query), "SELECT ban_length, TIMESTAMPDIFF(SQL_TSI_MINUTE, timestamp, CURRENT_TIMESTAMP), ban_reason FROM my_bans WHERE steam_id = '%s';", escapedSteamId);
 
-	connection.Query(BanStateOfClientChecked, query, client);
+	connection.Query(ReceivedBanStateInfo, query, client);
 }
 
-public void BanStateOfClientChecked(Database database, DBResultSet result, const char[] error, any data)
+public void ReceivedBanStateInfo(Database database, DBResultSet result, const char[] error, any client)
 {
-	int client = data;
 	if(client <= 0)
 		return;
 
